@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './App.css';
 
-// Mock UI Components (since we can't import from @/components/ui/)
 const FileUpload = ({ onChange, accept }) => (
   <input 
     type="file" 
@@ -24,7 +23,11 @@ const Select = ({ value, onChange, options }) => (
     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
   >
     {options.map((option) => (
-      <option key={option.value} value={option.value}>
+      <option 
+        key={option.value} 
+        value={option.value} 
+        disabled={option.disabled} // Disable the "Select Language" option
+      >
         {option.label}
       </option>
     ))}
@@ -49,7 +52,7 @@ const Card = ({ children, className }) => (
 
 const TranslationApp = () => {
   const [file, setFile] = useState(null);
-  const [language, setLanguage] = useState('es');
+  const [language, setLanguage] = useState('');
   const [translatedText, setTranslatedText] = useState('');
   const [audioSrc, setAudioSrc] = useState(null);
   const [pdfPath, setPdfPath] = useState(null);
@@ -58,18 +61,11 @@ const TranslationApp = () => {
   const [error, setError] = useState(null);
 
   const languageOptions = [
+    { value: '', label: 'Select Language', disabled: true }, // Default option
     { value: 'hi', label: 'Hindi' },
     { value: 'kn', label: 'Kannada' },
-    { value: 'bn', label: 'Bengali' },
-    { value: 'te', label: 'Telugu' },
-    { value: 'mr', label: 'Marathi' },
-    { value: 'ta', label: 'Tamil' },
-    { value: 'gu', label: 'Gujarati' },
-    { value: 'en', label: 'English' },
-    { value: 'ml', label: 'Malayalam' },
-    { value: 'or', label: 'Odia' },
-    { value: 'pa', label: 'Punjabi' },
-    { value: 'ne', label: 'Nepali' }  ];
+    { value: 'en', label: 'English' }
+  ];
 
   const handleFileUpload = (event) => {
     setFile(event.target.files[0]);
@@ -188,14 +184,14 @@ const TranslationApp = () => {
           />
         </div>
         <br/>
-<center>
-        <Button 
-          onClick={handleTranslate}
-          disabled={!file || isLoading}
-          className="mb-4"
-        >
-          {isLoading ? 'Translating...' : 'Translate PDF'}
-        </Button>
+        <center>
+          <Button 
+            onClick={handleTranslate}
+            disabled={!file || isLoading}
+            className="mb-4"
+          >
+            {isLoading ? 'Translating...' : 'Translate PDF'}
+          </Button>
         </center>
         {isLoading && (
           <div className="flex justify-center items-center">
@@ -209,25 +205,23 @@ const TranslationApp = () => {
             <div className="p-4 bg-gray-100 rounded">
               {translatedText}
             </div>
-        {audioSrc && (
+            {audioSrc && (
               <div className="mt-4">
                 <audio controls src={audioSrc}>
                   Your browser does not support the audio element.
                 </audio>
               </div>
-          )}
-          <center>
-            <div className="mt-4 flex space-x-4">
-              <Button onClick={handleDownloadPDF}>
-                Download Translated PDF
-              </Button>
-              <br/><br/>
-              <Button onClick={handleDownloadAudio}>
-                Download Audio
-              </Button>
-            </div>
+            )}
+            <center>
+              <div className="mt-4 flex space-x-4">
+                <Button onClick={handleDownloadPDF}>
+                  Download Translated PDF
+                </Button>
+                <Button onClick={handleDownloadAudio}>
+                  Download Audio
+                </Button>
+              </div>
             </center>
-           
           </div>
         )}
       </Card>

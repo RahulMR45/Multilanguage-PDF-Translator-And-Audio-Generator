@@ -1,7 +1,7 @@
 import os
 import tempfile
 import traceback
-from flask import Flask, request, send_file, jsonify, send_from_directory
+from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 from PyPDF2 import PdfReader
 import openai
@@ -9,24 +9,14 @@ import gtts
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
-# Comprehensive list of Indian language codes
-INDIAN_LANGUAGES = {
+# Comprehensive list of language codes
+LANGUAGES = {
     'hi': 'Hindi',
-  'bn': 'Bengali', 
-  'te': 'Telugu',
-  'mr': 'Marathi',
-  'ta': 'Tamil',
-  'ur': 'Urdu',
-  'gu': 'Gujarati',
-  'kn': 'Kannada',
-  'ml': 'Malayalam',
-  'pa': 'Punjabi',
-  'or': 'Odia',
-  'as': 'Assamese',
-  'sa': 'Sanskrit',
-  'en': 'English'
-
+    'kn': 'Kannada',
+    'en': 'English'
 }
 
 app = Flask(__name__)
@@ -38,6 +28,12 @@ openai.api_key = os.getenv('OPENAI_API_KEY')
 # Ensure temp directory exists
 TEMP_DIR = tempfile.mkdtemp()
 
+# Register fonts
+FONT_PATH_KANNADA = "static/fonts/NotoSansKannada-Regular.ttf"
+FONT_PATH_HINDI = "static/fonts/NotoSansDevanagari-Regular.ttf"
+pdfmetrics.registerFont(TTFont("NotoSansKannada", FONT_PATH_KANNADA))
+pdfmetrics.registerFont(TTFont("NotoSansDevanagari", FONT_PATH_HINDI))
+
 @app.route('/translate', methods=['POST'])
 def translate_pdf():
     try:
@@ -45,11 +41,11 @@ def translate_pdf():
             return jsonify({'error': 'No file uploaded'}), 400
         
         pdf_file = request.files['file']
-        target_language = request.form.get('language', 'hi')  # Default to Hindi
+        target_language = request.form.get('language', 'hi')  # Default to English
         
         # Validate language code
-        if target_language not in INDIAN_LANGUAGES:
-            return jsonify({'error': f'Unsupported language. Supported languages are: {", ".join(INDIAN_LANGUAGES.keys())}'}), 400
+        if target_language not in LANGUAGES:
+            return jsonify({'error': f'Unsupported language. Supported languages are: {", ".join(LANGUAGES.keys())}'}), 400
         
         # Read PDF
         pdf_reader = PdfReader(pdf_file)
@@ -58,21 +54,29 @@ def translate_pdf():
             full_text += page.extract_text()
         
         # Translate text using OpenAI API
+
+        
         translation_response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": f"Translate the following text to {INDIAN_LANGUAGES[target_language]} language. Preserve the original formatting and structure. Use proper language script and grammar."},
-                {"role": "user", "content": full_text}
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": f"Translate the following text to {LANGUAGES[target_language]} language. Ensure proper use of grammar, sentence structure, and cultural context. Keep the original meaning intact."},
+            {"role": "user", "content": full_text}
             ],
-            timeout=60  # Increased timeout for complex translations
+        timeout=60
         )
         translated_text = translation_response['choices'][0]['message']['content']
-        
         # Create translated PDF
         temp_pdf = os.path.join(TEMP_DIR, f'translated_{os.urandom(8).hex()}.pdf')
         can = canvas.Canvas(temp_pdf, pagesize=letter)
         text_object = can.beginText(inch, letter[1] - inch)
-        text_object.setFont("Helvetica", 10)  # Note: For full language support, consider using a Unicode font
+        
+        # Select font based on language
+        if target_language == 'kn':
+            text_object.setFont("NotoSansKannada", 12)
+        elif target_language == 'hi':
+            text_object.setFont("NotoSansDevanagari", 12)
+        else:
+            text_object.setFont("Helvetica", 12)  
         
         # Write translated text to PDF
         for line in translated_text.split('\n'):
@@ -94,7 +98,7 @@ def translate_pdf():
             'translated_text': translated_text,
             'pdf_path': temp_pdf,
             'audio_path': temp_audio,
-            'language': INDIAN_LANGUAGES[target_language]
+            'language': LANGUAGES[target_language]
         })
     
     except openai.error.OpenAIError as e:
@@ -104,7 +108,6 @@ def translate_pdf():
         print(f"Unexpected Translation Error: {traceback.format_exc()}")
         return jsonify({'error': f'Unexpected Translation Error: {str(e)}'}), 500
 
-# Existing routes remain the same
 @app.route('/get_audio', methods=['GET'])
 def get_audio():
     audio_path = request.args.get('path')
